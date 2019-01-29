@@ -807,7 +807,7 @@ for i in range(10):
 请求结束：
     根据当前线程的唯一标记，将“空调”上的数据移除。
 ```
-## 十八. 
+## 十八. flask上下文知识点
 ### 1. 偏函数
 ```
 import functools
@@ -885,15 +885,197 @@ for i in range(10):
 my_stack.pop()
 my_stack.pop()
 ```
+## 十九. 上下文管理
+### 1. Flask中Local和LocalStack的基本原理及request和session的基本实现
+```
+import functools
+try:
+    from greenlet import getcurrent as get_ident
+except:
+    from threading import get_ident
+
+class Local(object):
+    __slots__ = ('__storage__', '__ident_func__')
+
+    def __init__(self):
+        # __storage__ = {1231:{'stack':[]}}
+        object.__setattr__(self, '__storage__', {})
+        object.__setattr__(self, '__ident_func__', get_ident)
+
+    def __getattr__(self, name):
+        try:
+            return self.__storage__[self.__ident_func__()][name]
+        except KeyError:
+            raise AttributeError(name)
+
+    def __setattr__(self, name, value):
+        # name=stack
+        # value=[]
+        ident = self.__ident_func__()
+        storage = self.__storage__
+        try:
+            storage[ident][name] = value
+        except KeyError:
+            storage[ident] = {name: value}
+
+    def __delattr__(self, name):
+        try:
+            del self.__storage__[self.__ident_func__()][name]
+        except KeyError:
+            raise AttributeError(name)
+
+
+"""
+__storage__ = {
+    12312: {stack:[ctx(session/request) ,]}
+}
+
+"""
+
+# obj = Local()
+# obj.stack = []
+# obj.stack.append('佳俊')
+# obj.stack.append('咸鱼')
+# print(obj.stack)
+# print(obj.stack.pop())
+# print(obj.stack)
+
+
+class LocalStack(object):
+    def __init__(self):
+        self._local = Local()
+
+    def push(self,value):
+        rv = getattr(self._local, 'stack', None) # self._local.stack =>local.getattr
+        if rv is None:
+            self._local.stack = rv = [] #  self._local.stack =>local.setattr
+        rv.append(value) # self._local.stack.append(666)
+        return rv
+
+
+    def pop(self):
+        """Removes the topmost item from the stack, will return the
+        old value or `None` if the stack was already empty.
+        """
+        stack = getattr(self._local, 'stack', None)
+        if stack is None:
+            return None
+        elif len(stack) == 1:
+            return stack[-1]
+        else:
+            return stack.pop()
+
+    def top(self):
+        try:
+            return self._local.stack[-1]
+        except (AttributeError, IndexError):
+            return None
 
 
 
+class RequestContext(object):
+    def __init__(self):
+        self.request = "xx"
+        self.session = 'oo'
 
 
 
+_request_ctx_stack = LocalStack()
+
+_request_ctx_stack.push(RequestContext())
 
 
+def _lookup_req_object(arg):
 
+    ctx = _request_ctx_stack.top()
+
+    return getattr(ctx,arg) # ctx.request / ctx.session
+# 使用偏函数
+request = functools.partial(_lookup_req_object,'request')
+session = functools.partial(_lookup_req_object,'session')
+
+
+print(request())
+print(session())
+```
+### 2. 上下文管理之request实现
+- 请求到来wsgi封装成environ(请求的原生数据)
+- ctx = RequestContext(app, environ)创建请求上下文对象，同时设置ctx.request = Request(environ)
+- ctx.push()
+```
+在globals.py中
+_request_ctx_stack = LocalStack()
+在RequestContext.push中，为当前线程开辟了存储空间{"线程标识符":{"stack":[ctx,]}},把ctx对象添加到local中
+_request_ctx_stack.push(self)
+```
+### 3. 上下文管理之session实现
+- 请求到来wsgi封装成environ(请求的原生数据)
+- ctx = RequestContext(app, environ)创建请求上下文对象，同时设置ctx.request = Request(environ)
+- ctx.push()
+```
+在globals.py中
+_request_ctx_stack = LocalStack()
+在RequestContext.push中，为当前线程开辟了存储空间{"线程标识符":{"stack":[ctx,]}},把ctx对象添加到local中
+_request_ctx_stack.push(self)
+
+if self.session is None:
+    # session_interface = SecureCookieSessionInterface()
+    session_interface = self.app.session_interface
+    # 从cookie中获取session解密反序列化，封装成session对象返回
+    self.session = session_interface.open_session(
+        self.app, self.request
+    )
+```
+- 执行视图函数response = self.full_dispatch_request()
+```
+ctx = _request_ctx_stack.top  # 从Local中取出当前ctx
+.......
+if not self.session_interface.is_null_session(ctx.session):
+    # 执行SecureCookieSessionInterface实例化对的save_session()
+    self.session_interface.save_session(self, ctx.session, response)
+```
+### 4. flask-session
+```
+import redis
+from flask import Flask,request,session
+from flask.sessions import SecureCookieSessionInterface
+from flask_session import Session
+
+app = Flask(__name__)
+
+# app.session_interface = SecureCookieSessionInterface()
+# app.session_interface = RedisSessionInterface()
+app.config['SESSION_TYPE'] = 'redis'
+app.config['SESSION_REDIS'] = redis.Redis(host='140.143.227.206',port=6379,password='1234')
+Session(app)
+
+@app.route('/login')
+def login():
+    session['user'] = 'alex'
+    return 'asdfasfd'
+
+@app.route('/home')
+def index():
+    print(session.get('user'))
+
+    return '...'
+
+
+if __name__ == '__main__':
+    app.run()
+```
+- 原理
+```
+1. 将session数据保存到redis
+    session:随机字符串1:q23asifaksdfkajsdfasdf
+    session:随机字符串2:q23asifaksdfkajsdfasdf
+    session:随机字符串3:q23asifaksdfkajsdfasdf
+    session:随机字符串4:q23asifaksdfkajsdfasdf
+    session:随机字符串5:q23asifaksdfkajsdfasdf
+2. 随机字符串返回给用户。
+3. 下次请求到来时携带这个随机字符串过来
+源码：from flask_session import RedisSessionInterface
+```
 
 
 
