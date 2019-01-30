@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<div>
+    <a href="/add_user">添加</a>
+</div>
+<table>
+    <thead>
+    <tr>
+        <th>姓名</th>
+        <th>邮箱</th>
+        <th>操作</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for item in user_list %}
+    <tr>
+        <td>{{item.name}}</td>
+        <td>{{item.email}}</td>
+        <td><a href="/edit_user/{{loop.index0}}">编辑</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</body>
+</html>

@@ -189,6 +189,17 @@ def get_from_flash():
     return 'get from flash'
 
 
+@app.route('/test_url_for/<int:nid>')
+def test_url_for(nid):
+    print(nid)
+    return "zzzz"
+
+
+@app.route('/test_url_for2')
+def test_url_for2():
+    url = url_for('test_url_for', nid=222)
+    return redirect(url)
+
 
 if __name__ == '__main__':
     app.run()

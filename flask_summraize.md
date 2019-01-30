@@ -139,7 +139,7 @@ def login():
         if user_name == '123' and pwd == '123':
             # 写入到session，然后加密后写入到cookie返回给浏览器如
             # cookie=session=eyJ1c2VyIjoiMTIzIn0.XEU5eg.DI3uLdKwuFT6YDz9lF8EzMPVSyk;....
-            # 然后下次请时浏览器携带cookie到flask，flask解析cookie中的值，获取session然后解密封装成session对象
+            # 然后下次请求时浏览器携带cookie到flask，flask解析cookie中的值，获取session然后解密封装到session
             session['user'] = user_name
             return redirect(url_for('huanying'))
     return render_template('login.html')
@@ -147,7 +147,7 @@ def login():
 # 登陆验证原理：1、当用户发送账号密码进行登陆时，从数据库进行账号密码验证，账号密码错误返回登陆界面。
 # 账号密码验证ok设置session，session['user'] = user
 # 2、然后对session进行加密以key-value形式存入cookie，响应给浏览器
-# 3、下次访问时请求中携带cookie，flask取出session那部分key-value进行解密，封装成session对象
+# 3、下次访问时请求中携带cookie，flask取出session那部分key-value进行解密，封装到session
 # 4、对session.get('user', '')进行验证
 # 登陆验证方式一
 @app.route('/look_data')
@@ -477,8 +477,8 @@ if __name__ == '__main__':
 ```
 # 第一种
 @app.route('/xxx')
-    def index():
-        return "index"
+def index():
+    return "index"
 
 # 第二种
 def index():
@@ -791,14 +791,17 @@ for i in range(10):
     # ctx.session = None
     
     # 将包含了request/session的ctx对象放到“空调”
-        {
-            1232：{ctx:ctx对象}
-            1231：{ctx:ctx对象}
-            1211：{ctx:ctx对象}
-            1111：{ctx:ctx对象}
-            1261：{ctx:ctx对象}
-        }
-        
+        Local中
+            "__storage__": {
+                "线/协程标识符"｛"stack":[ctx对象即RequestContext实例化的对象,]｝
+                1232：{"stack":[ctx对象,]}
+                1231：{"stack":[ctx对象,]}
+                1211：{"stack":[ctx对象,]}
+                1111：{"stack":[ctx对象,]}
+                1261：{"stack":[ctx对象,]}
+                
+            }
+            RequestContext中属性self.request=Request和self.session
 视图函数：
     from flask import reuqest,session 
     
@@ -900,7 +903,7 @@ class Local(object):
     def __init__(self):
         # __storage__ = {1231:{'stack':[]}}
         object.__setattr__(self, '__storage__', {})
-        object.__setattr__(self, '__ident_func__', get_ident)
+        object.__setattr__(self, '__ident_func__', get_ident)  # __ident_func__ = get_ident 获取线程(协程)标识符的函数
 
     def __getattr__(self, name):
         try:

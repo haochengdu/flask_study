@@ -132,8 +132,9 @@ def upload():
             mysql_helper.insert_one(sql, (count, c_time, uid))
         except Exception as e:
             return 'MySQL错误= {}'.format(e)
-        return redirect('/detail/{}'.format(uid))
-
+        url = url_for('up_index.detail', uid=uid)
+        # return redirect('/detail/{}'.format(uid))
+        return redirect(url)
 
 
 
