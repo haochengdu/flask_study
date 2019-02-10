@@ -1079,7 +1079,94 @@ if __name__ == '__main__':
 3. 下次请求到来时携带这个随机字符串过来
 源码：from flask_session import RedisSessionInterface
 ```
+# 二十. WTForms
+### 1. 对象可以被for循环
+- 调用了类中的__iter__(self)方法
+```
+class Foo(object):
+    def __iter__(self):
+        # yield 1
+        # yield 2
+        # yield 3
+        # list、dict、str是可迭代对象，可以使用isinstance()判断一个对象是否为可Iterable对象
+        # 可以被next()函数调用并不断返回下一个值的对象称为迭代器：Iterator
+        # 把list、dict、str等Iterable变成Iterator可以使用iter()函数
+        # return ['qq', 'ww', 'aa']  # TypeError: iter() returned non-iterator of type 'list'
+        return iter(['qq', 'ww', 'aa'])
 
+    def __str__(self):
+        # return ['aa', 33, 'asd']  # TypeError: __str__ returned non-string (type list)
+        return 'qwe'
+
+
+foo = Foo()
+print(foo)
+for one in foo:
+    print(one)
+```
+### 2. 面向对像的__new__方法
+- __new__方法是用来创建类的实例化对象的，__init__方法是初始化实例化对象的
+```
+class Bar(object):
+    pass
+
+
+class Foo(object):
+    def __new__(cls, *args, **kwargs):
+        return Bar()
+
+foo = Foo()
+print(foo)
+```
+### 3. 类创建的两种方式
+```
+# 默认方式
+# class Foo(object):
+#     a1 = 8888
+#     def func(self):
+#         return 6666
+
+# 使用type来创建
+Foo = type('Foo', (object,), {'a1': 8888, 'func': lambda self: 6666})
+
+foo = Foo()
+print(foo.a1)
+print(foo.func())
+```
+### 4. metaclass的使用
+```
+class MyType(type):
+    def __init__(cls, *args, **kwargs):
+        super(MyType, cls).__init__(*args, **kwargs)
+
+    def __call__(cls, *args, **kwargs):
+        obj = cls.__new__(cls, *args, **kwargs)
+        cls.__init__(obj, *args, **kwargs)
+        return obj
+
+
+class Foo(object, metaclass=MyType):
+    a1 = 8888
+
+    def __new__(cls, *args, **kwargs):
+        return object.__new__(cls, *args, **kwargs)
+
+    def __init__(self):
+        pass
+
+    def func(self):
+        return 6666
+
+# Foo是MyType类的实例对象
+# obj是Foo类的实例对象
+obj = Foo()
+print(obj)
+```
+- 创建类时，先执行type的__init__
+- 类在实例化一个对象时，执行type的__call__，__call__方法的的返回值就是实例化的对象。
+- __call__内部调用：  
+        类.__new__，创建对象  
+        类.__init__，对象的初始化
 
 
 

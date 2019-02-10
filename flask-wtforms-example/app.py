@@ -11,7 +11,11 @@ from wtforms import widgets
 app = Flask(__name__, template_folder='templates')
 app.debug = True
 
-
+"""
+Form继承了FormMeta(type),执行FormMeta的__init__然后
+LoginForm._unbound_fields = None
+LoginForm._wtforms_meta = None
+"""
 class LoginForm(Form):
     name = simple.StringField(
         label='用户名',
@@ -35,7 +39,14 @@ class LoginForm(Form):
         widget=widgets.PasswordInput(),
         render_kw={'class': 'form-control'}
     )
-
+"""
+StringField和PasswordField都继承了Field,在实例化时调用了Field中的__new__方法执行了return UnboundField(cls, *args, **kwargs)
+当LoginForm解释完后
+LoginForm._unbound_fields = None
+LoginForm._wtforms_meta = None
+LoginForm.name = UnboundField(creation_counter=1,simple.StringField)
+LoginForm.pwd = UnboundField(creation_counter=2,simple.PasswordField)
+"""
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
